@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamSticks</title>
+    
+    <!-- Vinculación del Manifiesto PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <style>
+        /* Ocultar la insignia de Netlify por completo */
+        #netlify-badge, [id*="netlify-badge"], [class*="netlify-badge"] { display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #0d111d; color: #ffffff; font-family: 'Segoe UI', Roboto, sans-serif; padding-bottom: 70px; }
+
+        header {
+            position: sticky; top: 0; z-index: 100; background: #0d111d;
+            padding: 12px 16px 5px 16px; border-bottom: 1px solid #1a233a;
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .app-logo { font-size: 20px; font-weight: 900; color: #3b82f6; display: flex; align-items: center; gap: 8px; }
+        .header-icons { display: flex; gap: 16px; font-size: 18px; color: #94a3b8; cursor: pointer; }
+
+        #box-buscador-flotante { display: none; padding: 8px 0 12px 0; }
+        #input-buscador {
+            width: 100%; padding: 10px 14px; background: #131b2e; border: 1px solid #3b82f6;
+            color: white; border-radius: 8px; outline: none; font-size: 14px;
+        }
+
+        .tabs-categorias {
+            display: flex; gap: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 8px;
+        }
+        .tabs-categorias::-webkit-scrollbar { display: none; }
+        .tab-item {
+            color: #94a3b8; font-size: 14px; font-weight: 600; cursor: pointer; position: relative; padding-bottom: 4px;
+        }
+        .tab-item.active { color: #3b82f6; font-weight: 700; }
+        .tab-item.active::after {
+            content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: #3b82f6; border-radius: 2px;
+        }
+
+        nav.bottom-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 60px;
+            background: #090d16; border-top: 1px solid #1a233a; display: flex;
+            justify-content: space-around; align-items: center; z-index: 200;
+        }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center; gap: 3px;
+            color: #64748b; font-size: 10px; font-weight: 600; cursor: pointer; border: none; background: transparent;
+        }
+        .nav-item i { font-size: 18px; }
+        .nav-item.active { color: #3b82f6; }
+
+        .modal-auth {
+            display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 8, 15, 0.96); z-index: 400; justify-content: center; align-items: center; padding: 20px;
+        }
+        .auth-card {
+            background: #131b2e; border: 1px solid #1e2a47; padding: 24px; border-radius: 16px;
+            width: 100%; max-width: 380px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        .auth-tabs { display: flex; margin-bottom: 18px; border-bottom: 1px solid #1e2a47; }
+        .auth-tab-btn {
+            flex: 1; padding: 10px; background: transparent; border: none; color: #64748b;
+            font-weight: 700; font-size: 14px; cursor: pointer; text-align: center;
+        }
+        .auth-tab-btn.active { color: #3b82f6; border-bottom: 2px solid #3b82f6; }
+
+        .auth-card input {
+            width: 100%; padding: 12px; margin: 6px 0 12px 0; background: #090d16;
+            border: 1px solid #1e2a47; color: white; border-radius: 8px; outline: none; font-size: 14px;
+        }
+
+        .btn-accion {
+            background: #3b82f6; color: white; border: none; padding: 12px;
+            border-radius: 8px; width: 100%; font-weight: 700; cursor: pointer; font-size: 14px; margin-top: 6px;
+        }
+
+        main { padding: 16px; }
+        .vista-pantalla { display: none; }
+        .vista-pantalla.activa { display: block; }
+        .seccion-head { font-size: 16px; font-weight: 700; margin: 16px 0 10px 0; color: #f8fafc; }
+        .grid-catalogo { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
+
+        .card-stream {
+            background: #131b2e; border-radius: 10px; overflow: hidden; position: relative;
+            border: 1px solid #1e2a47; cursor: pointer; transition: transform 0.2s;
+        }
+        .card-stream img { width: 100%; height: 155px; object-fit: cover; display: block; background: #090d16; }
+        .card-stream .title { padding: 6px 8px; font-size: 11px; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .btn-del-item {
+            position: absolute; top: 4px; right: 4px; background: rgba(239, 68, 68, 0.9);
+            color: white; border: none; width: 24px; height: 24px; border-radius: 50%;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px; z-index: 10;
+        }
+
+        .reproductor-superior { 
+            width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 12px; 
+            overflow: hidden; border: 1px solid #1e2a47; position: relative; margin-bottom: 8px; 
+        }
+        .reproductor-superior video { width: 100%; height: 100%; display: block; object-fit: contain; }
+
+        .servidores-grid { display: flex; gap: 8px; margin-bottom: 12px; }
+        .btn-servidor {
+            background: #131b2e; border: 1px solid #1e2a47; color: #94a3b8; padding: 6px 12px;
+            border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; flex: 1; text-align: center;
+        }
+        .btn-servidor.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+
+        .episodios-grid { display: flex; gap: 10px; overflow-x: auto; padding: 6px 0 12px 0; }
+        .episodios-grid::-webkit-scrollbar { height: 6px; }
+        .episodios-grid::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 3px; }
+        .btn-episodio {
+            min-width: 50px; height: 50px; background: #131b2e; border: 1px solid #1e2a47;
+            color: white; font-weight: bold; border-radius: 8px; display: flex; align-items: center;
+            justify-content: center; cursor: pointer; flex-shrink: 0; font-size: 14px;
+        }
+        .btn-episodio:hover, .btn-episodio.active { background: #3b82f6; border-color: #3b82f6; }
+
+        .profile-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+        .profile-avatar { width: 55px; height: 55px; border-radius: 50%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .profile-info h3 { font-size: 16px; color: #fff; }
+        .profile-info p { font-size: 11px; color: #64748b; }
+
+        .profile-stats { display: flex; gap: 10px; margin-bottom: 15px; }
+        .stat-card { flex: 1; background: #131b2e; padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #1e2a47; }
+        .stat-card i { font-size: 18px; color: #3b82f6; margin-bottom: 4px; }
+        .stat-card p { font-size: 11px; color: #94a3b8; }
+
+        .device-item { display: flex; justify-content: space-between; align-items: center; background: #090d16; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #1e2a47; font-size: 12px; }
+        .btn-kick { background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; }
+
+        .box-creador { background: #131b2e; border: 1px solid #1e2a47; padding: 18px; border-radius: 12px; margin-bottom: 20px; }
+        .box-creador label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+        .box-creador input, .box-creador select, .box-creador textarea {
+            width: 100%; padding: 10px; background: #090d16; border: 1px solid #1e2a47; color: white; border-radius: 6px; font-size: 13px; margin-bottom: 10px; outline: none;
+        }
+    </style>
+</head>
+<body>
+
+    <header id="main-header">
+        <div class="header-top">
+            <div class="app-logo"><i class="fa-solid fa-play"></i> StreamSticks</div>
+            <div class="header-icons">
+                <i class="fa-solid fa-magnifying-glass" onclick="toggleBuscador()"></i>
+                <i class="fa-solid fa-clock-rotate-left" onclick="cambiarNavegacion('vista-inicio')"></i>
+            </div>
+        </div>
+        
+        <div id="box-buscador-flotante">
+            <input type="text" id="input-buscador" placeholder="Buscar serie, película o anime..." oninput="filtrarContenidoTexto()">
+        </div>
+
+        <div class="tabs-categorias" id="tabs-cat-container">
+            <div class="tab-item active" onclick="filtrarCategoria('todas', this)">Recomendado</div>
+            <div class="tab-item" onclick="filtrarCategoria('series', this)">Series</div>
+            <div class="tab-item" onclick="filtrarCategoria('peliculas', this)">Películas</div>
+            <div class="tab-item" onclick="filtrarCategoria('animes', this)">Anime</div>
+            <div class="tab-item" onclick="filtrarCategoria('caricaturas', this)">Caricaturas</div>
+        </div>
+    </header>
+
+    <div class="modal-auth" id="modal-auth">
+        <div class="auth-card">
+            <div class="auth-tabs">
+                <button class="auth-tab-btn active" id="tab-btn-login" onclick="cambiarModoAuth(false)">Iniciar Sesión</button>
+                <button class="auth-tab-btn" id="tab-btn-registro" onclick="cambiarModoAuth(true)">Registrarse</button>
+            </div>
+
+            <div id="form-auth-campos">
+                <input type="text" id="auth-user" placeholder="Nombre de usuario">
+                <div id="box-email-reg" style="display: none;">
+                    <input type="email" id="auth-email" placeholder="Correo electrónico">
+                </div>
+                <input type="password" id="auth-pass" placeholder="Contraseña">
+                <div id="box-pass-confirm" style="display: none;">
+                    <input type="password" id="auth-pass-confirm" placeholder="Confirmar contraseña">
+                </div>
+                <button class="btn-accion" id="btn-submit-auth" onclick="procesarAutenticacion()">Entrar</button>
+            </div>
+
+            <div id="form-auth-otp" style="display: none;">
+                <p style="color: #34c759; font-size: 12px; margin-bottom: 8px;"><i class="fa-solid fa-shield-halved"></i> Segunda Contraseña (Key 2)</p>
+                <input type="password" id="auth-otp-code" placeholder="Key 2 Secreta" style="width:150px; text-align:center; font-size:16px;">
+                <button class="btn-accion" onclick="verificarCodigoCreador()">Verificar Key 2</button>
+            </div>
+        </div>
+    </div>
+        <main>
+        <div class="vista-pantalla activa" id="vista-inicio">
+            <div id="contenedor-feeds"></div>
+        </div>
+
+        <div class="vista-pantalla" id="vista-detalles">
+            <button class="btn-accion" style="width:auto; padding:6px 12px; background:#131b2e; color:#3b82f6; border:1px solid #1e2a47; margin-bottom:12px;" onclick="cambiarNavegacion('vista-inicio')"><i class="fa-solid fa-arrow-left"></i> Volver</button>
+            
+            <div>
+                <div class="reproductor-superior" id="contenedor-video-player">
+                    <video id="html5-player" controls playsinline webkit-playsinline preload="metadata">
+                        <source id="player-src" src="" type="video/mp4">
+                    </video>
+                </div>
+
+                <div class="servidores-grid" id="box-servidores" style="display: none;">
+                    <button class="btn-servidor active" id="srv-1" onclick="cambiarServidor(1)">Servidor Principal</button>
+                    <button class="btn-servidor" id="srv-2" onclick="cambiarServidor(2)">Servidor Alternativo</button>
+                </div>
+
+                <h2 id="detalles-titulo" style="color: #ffffff; font-size: 18px; margin-bottom: 6px;">-</h2>
+
+                <h4 style="font-size: 13px; color: #3b82f6; margin: 10px 0 6px 0;"><i class="fa-solid fa-list"></i> Lista de Episodios</h4>
+                <div id="detalles-episodios" class="episodios-grid"></div>
+
+                <p id="detalles-desc" style="font-size: 13px; color: #94a3b8; margin-top: 12px; line-height: 1.4; background:#131b2e; padding:12px; border-radius:8px; border:1px solid #1e2a47;"></p>
+            </div>
+        </div>
+
+        <div class="vista-pantalla" id="vista-creador">
+            <div class="box-creador">
+                <h3 style="color: #3b82f6; font-size: 16px; margin-bottom: 12px;"><i class="fa-solid fa-sliders"></i> Panel del Creador (En Línea)</h3>
+                
+                <label>Título:</label>
+                <input type="text" id="sub-titulo" placeholder="Ej: Hora de aventura" oninput="comprobarUltimoEpisodio()">
+
+                <label>Categoría:</label>
+                <select id="sub-categoria" onchange="toggleCampoEpisodio()">
+                    <option value="series">Series</option>
+                    <option value="peliculas">Películas</option>
+                    <option value="animes">Anime</option>
+                    <option value="caricaturas">Caricaturas</option>
+                </select>
+
+                <div id="group-episodio">
+                    <label>Capítulo / Episodio:</label>
+                    <input type="text" id="sub-episodio" placeholder="Ej: Capítulo 1">
+                </div>
+
+                <div id="group-portada">
+                    <label>Enlace de Portada (URL de Imagen):</label>
+                    <input type="text" id="sub-poster-url" placeholder="https://ejemplo.com/imagen.jpg">
+                </div>
+
+                <label style="margin-top: 10px;">Enlace Principal de Video (MP4 directo o Google Drive):</label>
+                <input type="text" id="sub-video-url" placeholder="https://... (Enlace .mp4 o Google Drive)">
+
+                <label style="margin-top: 10px;">Enlace Alternativo (Opcional / Servidor 2):</label>
+                <input type="text" id="sub-video-url2" placeholder="https://... (Enlace .mp4 o Google Drive)">
+
+                <label style="margin-top: 10px;">Descripción:</label>
+                <textarea id="sub-desc" placeholder="Sinopsis..."></textarea>
+
+                <button class="btn-accion" onclick="publicarDesdeCreador()">Publicar en Línea</button>
+            </div>
+
+            <div class="box-creador" style="margin-top: 20px;">
+                <h4 style="color: #3b82f6; font-size: 14px; margin-bottom: 10px;"><i class="fa-solid fa-clipboard-list"></i> Peticiones de Usuarios</h4>
+                <div id="lista-peticiones-admin">Sin peticiones nuevas.</div>
+            </div>
+        </div>
+
+        <div class="vista-pantalla" id="vista-perfil">
+            <div class="profile-header">
+                <div class="profile-avatar"><i class="fa-solid fa-user"></i></div>
+                <div class="profile-info">
+                    <h3 id="lbl-perfil-user">-</h3>
+                    <p id="lbl-perfil-email">-</p>
+                </div>
+            </div>
+
+            <div class="profile-stats">
+                <div class="stat-card"><i class="fa-solid fa-clock"></i><p id="lbl-perfil-horas">0 hrs vistas</p></div>
+                <div class="stat-card"><i class="fa-solid fa-shield-cat"></i><p id="lbl-perfil-rol">Usuario</p></div>
+            </div>
+
+            <div class="box-creador" style="margin-bottom: 15px;">
+                <h4 style="color: #3b82f6; font-size: 14px; margin-bottom: 8px;"><i class="fa-solid fa-bullhorn"></i> Solicitar Serie o Película</h4>
+                <input type="text" id="input-peticion" placeholder="Escribe el nombre de lo que quieres ver...">
+                <button class="btn-accion" style="padding: 8px; font-size: 12px;" onclick="enviarPeticion()">Enviar Petición</button>
+            </div>
+
+            <div class="box-creador" style="margin-bottom: 15px;">
+                <h4 style="color: #3b82f6; font-size: 14px; margin-bottom: 10px;"><i class="fa-solid fa-mobile-screen-button"></i> Dispositivos Conectados</h4>
+                <div id="lista-dispositivos"></div>
+            </div>
+
+            <button class="btn-accion" style="background:#ef4444;" onclick="cerrarSesion()">Cerrar Sesión</button>
+        </div>
+    </main>
+
+    <nav class="bottom-nav">
+        <button class="nav-item active" onclick="cambiarNavegacion('vista-inicio', this)"><i class="fa-solid fa-house"></i><span>Inicio</span></button>
+        <button class="nav-item" id="btn-creador-bottom" style="display:none;" onclick="cambiarNavegacion('vista-creador', this)"><i class="fa-solid fa-cloud-arrow-up"></i><span>Creador</span></button>
+        <button class="nav-item" onclick="cambiarNavegacion('vista-perfil', this)"><i class="fa-solid fa-user"></i><span>Perfil</span></button>
+    </nav>
+        <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBppQDXPOD73QCIxq1Ezywn0hiIkZxfwSI",
+            authDomain: "streamsticks-105c0.firebaseapp.com",
+            databaseURL: "https://streamsticks-105c0-default-rtdb.firebaseio.com",
+            projectId: "streamsticks-105c0",
+            storageBucket: "streamsticks-105c0.firebasestorage.app",
+            messagingSenderId: "263307530566",
+            appId: "1:263307530566:web:5adc8b2c60d426798fd547"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let usuarioSesion = JSON.parse(localStorage.getItem('app_sesion_activa')) || null;
+        let deviceId = localStorage.getItem('app_device_id');
+        if (!deviceId) {
+            deviceId = 'dev_' + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('app_device_id', deviceId);
+        }
+
+        let catalogoDB = { series: [], peliculas: [], animes: [], caricaturas: [] };
+        let esModoRegistro = false;
+        let episodioActualGlobal = { video: "", video2: "" };
+
+        window.onload = function() {
+            // 🔥 Borrar a la fuerza cualquier insignia de Netlify inyectada dinámicamente
+            const badgeNetlify = document.getElementById('netlify-badge') || document.querySelector('[class*="netlify"]');
+            if (badgeNetlify) badgeNetlify.remove();
+
+            if (!usuarioSesion) {
+                document.getElementById('modal-auth').style.display = 'flex';
+            } else {
+                verificarSesionEnLinea();
+            }
+
+            db.ref('catalogo').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    catalogoDB = data;
+                    renderizarCatalogo('todas');
+                }
+            });
+
+            db.ref('peticiones').on('value', (snapshot) => {
+                const pets = snapshot.val();
+                const contenedor = document.getElementById('lista-peticiones-admin');
+                if (!contenedor) return;
+                contenedor.innerHTML = "";
+                if (pets) {
+                    Object.keys(pets).forEach(id => {
+                        const div = document.createElement('div');
+                        div.className = 'device-item';
+                        div.innerHTML = `<span><strong>${pets[id].usuario}:</strong> ${pets[id].texto}</span>`;
+                        contenedor.appendChild(div);
+                    });
+                } else {
+                    contenedor.innerHTML = "Sin peticiones nuevas.";
+                }
+            });
+        };
+
+        function verificarSesionEnLinea() {
+            const safeUserKey = usuarioSesion.username.replace(/[.#$\/\[\]]/g, "_");
+            db.ref(`usuarios/${safeUserKey}/dispositivos/${deviceId}`).on('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    alert("Tu sesión fue cerrada o este dispositivo fue expulsado.");
+                    cerrarSesion();
+                } else {
+                    iniciarAplicacion();
+                }
+            });
+        }
+
+        function cambiarModoAuth(modoReg) {
+            esModoRegistro = modoReg;
+            document.getElementById('tab-btn-login').classList.toggle('active', !modoReg);
+            document.getElementById('tab-btn-registro').classList.toggle('active', modoReg);
+            document.getElementById('box-email-reg').style.display = modoReg ? 'block' : 'none';
+            document.getElementById('box-pass-confirm').style.display = modoReg ? 'block' : 'none';
+            document.getElementById('btn-submit-auth').innerText = modoReg ? 'Registrarse' : 'Entrar';
+        }
+
+        function procesarAutenticacion() {
+            const username = document.getElementById('auth-user').value.trim();
+            const password = document.getElementById('auth-pass').value.trim();
+            const passConfirm = document.getElementById('auth-pass-confirm').value.trim();
+            const email = document.getElementById('auth-email').value.trim();
+
+            if (esModoRegistro) {
+                if (!username || !password || !passConfirm || !email) { alert("Completa todos los campos."); return; }
+                if (password !== passConfirm) { alert("Las contraseñas no coinciden."); return; }
+
+                const esCreador = (username.toUpperCase() === "GT_MINATO");
+                const nuevaCuenta = { username, password, email, esCreador, horasVistas: 0 };
+                
+                const safeUserKey = username.replace(/[.#$\/\[\]]/g, "_");
+                db.ref(`cuentas/${safeUserKey}`).set(nuevaCuenta).then(() => {
+                    iniciarSesionDirecta(nuevaCuenta);
+                });
+            } else {
+                if (!username || !password) { alert("Ingresa usuario y contraseña."); return; }
+                
+                const safeUserKey = username.replace(/[.#$\/\[\]]/g, "_");
+                db.ref(`cuentas/${safeUserKey}`).once('value', (snapshot) => {
+                    const cuentaEncontrada = snapshot.val();
+                    if (!cuentaEncontrada || cuentaEncontrada.password !== password) {
+                        alert("Credenciales incorrectas.");
+                        return;
+                    }
+
+                    if (cuentaEncontrada.esCreador) {
+                        document.getElementById('form-auth-campos').style.display = 'none';
+                        document.getElementById('form-auth-otp').style.display = 'block';
+                    } else {
+                        iniciarSesionDirecta(cuentaEncontrada);
+                    }
+                });
+            }
+        }
+
+        function verificarCodigoCreador() {
+            const key2Ingresada = document.getElementById('auth-otp-code').value.trim();
+            if (key2Ingresada === "MINATO2013") {
+                iniciarSesionDirecta({ username: "GT_MINATO", esCreador: true, horasVistas: 0 });
+            } else { 
+                alert("Key 2 secreta incorrecta."); 
+            }
+        }
+
+        function iniciarSesionDirecta(cuenta) {
+            usuarioSesion = cuenta;
+            localStorage.setItem('app_sesion_activa', JSON.stringify(usuarioSesion));
+
+            const safeUserKey = cuenta.username.replace(/[.#$\/\[\]]/g, "_");
+            const deviceInfo = {
+                nombre: navigator.userAgent.includes("Mobi") ? "Dispositivo Móvil" : "Navegador Web",
+                ultimoAcceso: new Date().toLocaleString()
+            };
+            db.ref(`usuarios/${safeUserKey}/dispositivos/${deviceId}`).set(deviceInfo).then(() => {
+                document.getElementById('modal-auth').style.display = 'none';
+                verificarSesionEnLinea();
+                verificarActualizacionApp();
+            });
+        }
+
+        function iniciarAplicacion() {
+            document.getElementById('lbl-perfil-user').innerText = usuarioSesion.username;
+            document.getElementById('lbl-perfil-email').innerText = usuarioSesion.email || "Sin correo";
+            document.getElementById('lbl-perfil-horas').innerText = `${(usuarioSesion.horasVistas || 0).toFixed(1)} hrs vistas`;
+            document.getElementById('lbl-perfil-rol').innerText = usuarioSesion.esCreador ? "Creador Oficial" : "Usuario";
+            if (usuarioSesion.esCreador) {
+                document.getElementById('btn-creador-bottom').style.display = 'flex';
+            }
+            cargarDispositivosConectados();
+        }
+
+        function cargarDispositivosConectados() {
+            const safeUserKey = usuarioSesion.username.replace(/[.#$\/\[\]]/g, "_");
+            db.ref(`usuarios/${safeUserKey}/dispositivos`).on('value', (snapshot) => {
+                const dispositivos = snapshot.val();
+                const contenedor = document.getElementById('lista-dispositivos');
+                contenedor.innerHTML = "";
+                if (dispositives || dispositivos) {
+                    Object.keys(dispositivos || {}).forEach(id => {
+                        const dev = dispositivos[id];
+                        const esEste = (id === deviceId);
+                        const div = document.createElement('div');
+                        div.className = 'device-item';
+                        div.innerHTML = `<div><strong>${dev.nombre}</strong> ${esEste ? '(Este)' : ''}</div> ${!esEste ? `<button class="btn-kick" onclick="expulsar('${id}')">Expulsar</button>` : ''}`;
+                        contenedor.appendChild(div);
+                    });
+                }
+            });
+        }
+
+        function expulsar(targetId) {
+            const safeUserKey = usuarioSesion.username.replace(/[.#$\/\[\]]/g, "_");
+            db.ref(`usuarios/${safeUserKey}/dispositivos/${targetId}`).remove();
+        }
+
+        function enviarPeticion() {
+            const texto = document.getElementById('input-peticion').value.trim();
+            if (!texto) { alert("Escribe qué serie o película quieres solicitar."); return; }
+            db.ref('peticiones').push({ usuario: usuarioSesion.username, texto }).then(() => {
+                alert("¡Petición enviada al creador con éxito!");
+                document.getElementById('input-peticion').value = "";
+            });
+        }
+
+        function toggleBuscador() {
+            const box = document.getElementById('box-buscador-flotante');
+            const tabs = document.getElementById('tabs-cat-container');
+            if (box.style.display === 'block') {
+                box.style.display = 'none';
+                tabs.style.display = 'flex';
+                renderizarCatalogo('todas');
+            } else {
+                box.style.display = 'block';
+                tabs.style.display = 'none';
+                document.getElementById('input-buscador').focus();
+            }
+        }
+
+        function filtrarContenidoTexto() {
+            const query = document.getElementById('input-buscador').value.trim().toLowerCase();
+            const contenedor = document.getElementById('contenedor-feeds');
+            contenedor.innerHTML = "";
+
+            ['series', 'peliculas', 'animes', 'caricaturas'].forEach(cat => {
+                if (catalogoDB[cat]) {
+                    const filtrados = catalogoDB[cat].filter(item => 
+                        (item.titulo && item.titulo.toLowerCase().includes(query)) || 
+                        (item.baseTitulo && item.baseTitulo.toLowerCase().includes(query))
+                    );
+
+                    if (filtrados.length > 0) {
+                        const sec = document.createElement('div');
+                        sec.innerHTML = `<h3 class="seccion-head">Resultados en ${cat.toUpperCase()}</h3>`;
+                        const grid = document.createElement('div');
+                        grid.className = 'grid-catalogo';
+
+                        filtrados.forEach(item => {
+                            const card = document.createElement('div');
+                            card.className = 'card-stream';
+                            card.innerHTML = `<img src="${item.poster}" alt=""><div class="title">${item.baseTitulo || item.titulo}</div>`;
+                            card.onclick = () => abrirDetallesSerie({ titulo: item.baseTitulo || item.titulo, desc: item.desc, poster: item.poster, episodios: [item] });
+                            grid.appendChild(card);
+                        });
+                        sec.appendChild(grid);
+                        contenedor.appendChild(sec);
+                    }
+                }
+            });
+        }
+
+        function toggleCampoEpisodio() {
+            const cat = document.getElementById('sub-categoria').value;
+            document.getElementById('group-episodio').style.display = (cat === 'series' || cat === 'animes') ? 'block' : 'none';
+            comprobarUltimoEpisodio();
+        }
+
+        function comprobarUltimoEpisodio() {
+            const titulo = document.getElementById('sub-titulo').value.trim().toLowerCase();
+            const cat = document.getElementById('sub-categoria').value;
+            const inputEp = document.getElementById('sub-episodio');
+            const groupPortada = document.getElementById('group-portada');
+
+            if (!titulo || (cat !== 'series' && cat !== 'animes')) { groupPortada.style.display = 'block'; return; }
+
+            const lista = catalogoDB[cat] || [];
+            const coincidencias = lista.filter(i => i.baseTitulo && i.baseTitulo.toLowerCase() === titulo);
+
+            if (coincidencias.length > 0) {
+                inputEp.value = `Capítulo ${coincidencias.length + 1}`;
+                groupPortada.style.display = 'none'; 
+            } else {
+                inputEp.value = "Capítulo 1";
+                groupPortada.style.display = 'block';
+            }
+        }
+                // ==========================================
+        // PROCESO DE PUBLICACIÓN (5 PARTES EQUILIBRADAS)
+        // ==========================================
+
+        // PARTE 1: Obtención y validación de datos del formulario
+        function obtenerDatosFormularioCreador() {
+            const titulo = document.getElementById('sub-titulo').value.trim();
+            const cat = document.getElementById('sub-categoria').value;
+            const episodio = document.getElementById('sub-episodio').value.trim();
+            const posterURL = document.getElementById('sub-poster-url').value.trim();
+            const videoURLRaw = document.getElementById('sub-video-url').value;
+            const videoURL2Raw = document.getElementById('sub-video-url2').value;
+            const desc = document.getElementById('sub-desc').value.trim();
+
+            if (!titulo || !videoURLRaw.trim() || !desc) {
+                alert("Completa título, enlace principal y descripción.");
+                return null;
+            }
+
+            return { titulo, cat, episodio, posterURL, videoURLRaw, videoURL2Raw, desc };
+        }
+
+        // PARTE 2: Formateador de enlaces de video (.mp4 y Google Drive)
+        function formatearEnlaceVideo(url) {
+            if (!url) return "";
+            url = url.trim();
+            if (url.includes("drive.google.com") && url.includes("/file/d/")) {
+                const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                if (match && match[1]) {
+                    return `https://docs.google.com/uc?export=download&id=${match[1]}`;
+                }
+            }
+            return url;
+        }
+
+        // PARTE 3: Determinación de la portada final
+        function obtenerPortadaFinal(cat, titulo, posterURL) {
+            const lista = catalogoDB[cat] || [];
+            const existente = lista.find(i => i.baseTitulo && i.baseTitulo.toLowerCase() === titulo.toLowerCase());
+            const posterFinal = existente ? existente.poster : posterURL;
+
+            if (!posterFinal) {
+                alert("Ingresa un enlace de portada.");
+                return null;
+            }
+            return posterFinal;
+        }
+
+        // PARTE 4: Construcción del objeto del nuevo elemento
+        function crearObjetoContenido(datos, videoURLFinal, videoURL2Final, posterFinal) {
+            return {
+                id: Date.now(),
+                baseTitulo: datos.titulo,
+                episodio: (datos.cat === 'series' || datos.cat === 'animes') ? (datos.episodio || "Capítulo 1") : "Único",
+                desc: datos.desc,
+                poster: posterFinal,
+                video: videoURLFinal,
+                video2: videoURL2Final || ""
+            };
+        }
+
+        // PARTE 5: Guardado en Firebase y limpieza del formulario
+        function publicarDesdeCreador() {
+            const datos = obtenerDatosFormularioCreador();
+            if (!datos) return;
+
+            const videoURLFinal = formatearEnlaceVideo(datos.videoURLRaw);
+            const videoURL2Final = formatearEnlaceVideo(datos.videoURL2Raw);
+
+            const posterFinal = obtenerPortadaFinal(datos.cat, datos.titulo, datos.posterURL);
+            if (!posterFinal) return;
+
+            const nuevoItem = crearObjetoContenido(datos, videoURLFinal, videoURL2Final, posterFinal);
+
+            if (!catalogoDB[datos.cat]) catalogoDB[datos.cat] = [];
+            catalogoDB[datos.cat].push(nuevoItem);
+
+            db.ref('catalogo').set(catalogoDB).then(() => {
+                alert("¡Publicado con éxito!");
+                document.getElementById('sub-titulo').value = "";
+                document.getElementById('sub-poster-url').value = "";
+                document.getElementById('sub-video-url').value = "";
+                document.getElementById('sub-video-url2').value = "";
+                document.getElementById('sub-desc').value = "";
+                cambiarNavegacion('vista-inicio', document.querySelector('.bottom-nav button'));
+            });
+        }
+
+        // ==========================================
+        // FIN DEL PROCESO DE PUBLICACIÓN
+        // ==========================================
+
+        function renderizarCatalogo(filtroCat) {
+            const contenedor = document.getElementById('contenedor-feeds');
+            contenedor.innerHTML = "";
+            const categorias = (filtroCat === 'todas') ? ['series', 'peliculas', 'animes', 'caricaturas'] : [filtroCat];
+
+            categorias.forEach(cat => {
+                if (catalogoDB[cat] && catalogoDB[cat].length > 0) {
+                    const sec = document.createElement('div');
+                    sec.innerHTML = `<h3 class="seccion-head">${cat.toUpperCase()}</h3>`;
+                    const grid = document.createElement('div');
+                    grid.className = 'grid-catalogo';
+
+                    let itemsMostrados = [];
+                    if (cat === 'series' || cat === 'animes') {
+                        let agrupados = {};
+                        catalogoDB[cat].forEach(item => {
+                            let nombre = item.baseTitulo || "Sin título";
+                            if (!agrupados[nombre]) agrupados[nombre] = { ...item, titulo: nombre, episodios: [] };
+                            agrupados[nombre].episodios.push(item);
+                        });
+                        itemsMostrados = Object.values(agrupados);
+                    } else {
+                        itemsMostrados = catalogoDB[cat].map(item => ({ ...item, titulo: item.baseTitulo || "Película", episodios: [item] }));
+                    }
+
+                    itemsMostrados.forEach(item => {
+                        const card = document.createElement('div');
+                        card.className = 'card-stream';
+                        let btnDel = (usuarioSesion && usuarioSesion.esCreador) ? `<button class="btn-del-item" onclick="eliminarItem('${cat}', ${item.id}, event)"><i class="fa-solid fa-trash"></i></button>` : '';
+                        card.innerHTML = `${btnDel}<img src="${item.poster}" alt=""><div class="title">${item.titulo}</div>`;
+                        card.onclick = () => abrirDetallesSerie(item);
+                        grid.appendChild(card);
+                    });
+                    sec.appendChild(grid);
+                    contenedor.appendChild(sec);
+                }
+            });
+        }
+
+        function abrirDetallesSerie(serie) {
+            document.getElementById('detalles-titulo').innerText = serie.titulo;
+            document.getElementById('detalles-desc').innerText = serie.desc;
+
+            localStorage.setItem('streamsticks_ultimo_visto', serie.titulo);
+
+            const contenedorEpisodios = document.getElementById('detalles-episodios');
+            contenedorEpisodios.innerHTML = "";
+
+            serie.episodios.forEach((ep, index) => {
+                const btnEp = document.createElement('button');
+                btnEp.className = 'btn-episodio';
+                btnEp.innerText = index + 1;
+                btnEp.onclick = () => {
+                    document.querySelectorAll('.btn-episodio').forEach(b => b.classList.remove('active'));
+                    btnEp.classList.add('active');
+                    cargarEpisodioEnReproductor(ep);
+                };
+                if (index === 0) {
+                    btnEp.classList.add('active');
+                    cargarEpisodioEnReproductor(ep);
+                }
+                contenedorEpisodios.appendChild(btnEp);
+            });
+
+            cambiarNavegacion('vista-detalles');
+        }
+
+        function cargarEpisodioEnReproductor(ep) {
+            episodioActualGlobal = ep;
+            const boxSrv = document.getElementById('box-servidores');
+            if (ep.video2 && ep.video2.trim() !== "") {
+                boxSrv.style.display = 'flex';
+            } else {
+                boxSrv.style.display = 'none';
+            }
+            cambiarServidor(1);
+        }
+
+        function cambiarServidor(num) {
+            const player = document.getElementById('html5-player');
+            const source = document.getElementById('player-src');
+            document.getElementById('srv-1').classList.toggle('active', num === 1);
+            document.getElementById('srv-2').classList.toggle('active', num === 2);
+
+            let urlElegida = (num === 2 && episodioActualGlobal.video2) ? episodioActualGlobal.video2 : episodioActualGlobal.video;
+            source.src = urlElegida;
+            player.load();
+        }
+
+        function eliminarItem(cat, id, ev) {
+            if (ev) ev.stopPropagation();
+            if (confirm("¿Eliminar contenido?")) {
+                catalogoDB[cat] = catalogoDB[cat].filter(i => i.id !== id);
+                db.ref('catalogo').set(catalogoDB).then(() => renderizarCatalogo('todas'));
+            }
+        }
+
+        function filtrarCategoria(cat, btn) {
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+            renderizarCatalogo(cat);
+        }
+
+        function cambiarNavegacion(vistaId, btn) {
+            if(vistaId !== 'vista-detalles') {
+                document.getElementById('html5-player').pause();
+            }
+            document.querySelectorAll('.vista-pantalla').forEach(v => v.classList.remove('activa'));
+            document.getElementById(vistaId).classList.add('activa');
+            if (btn) {
+                document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+                btn.classList.add('active');
+            }
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('app_sesion_activa');
+            location.reload();
+        }
+
+        // ==========================================
+        // SISTEMA DE ACTUALIZACIÓN DE APK INDEPENDIENTE
+        // ==========================================
+        const VERSION_ACTUAL_APP = "1.0.0"; 
+
+        function verificarActualizacionApp() {
+            db.ref('config').once('value', (snapshot) => {
+                const configRemota = snapshot.val();
+                if (configRemota && configRemota.version) {
+                    if (configRemota.version !== VERSION_ACTUAL_APP) {
+                        mostrarAlertaActualizacion(configRemota.urlApk, configRemota.mensaje);
+                    }
+                }
+            });
+        }
+
+        function mostrarAlertaActualizacion(urlDescarga, mensaje) {
+            const actualizar = confirm(mensaje + "\n\n¿Deseas descargar la nueva versión ahora?");
+            if (actualizar) {
+                window.open(urlDescarga, '_blank');
+            }
+        }
+    </script>
+</body>
+</html>
